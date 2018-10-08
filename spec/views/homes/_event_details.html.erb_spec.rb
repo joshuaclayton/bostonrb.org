@@ -1,6 +1,7 @@
 RSpec.describe "homes/_event_details.html.erb_spec.rb", type: :view do
   it "renders details about the event" do
-    event = MeetupEvent.new(event_data)
+    parsed_event = EventParser.new(event_data).parse
+    event = EventPresenter.new(parsed_event)
 
     render("homes/event_details", event: event)
 
@@ -13,7 +14,7 @@ RSpec.describe "homes/_event_details.html.erb_spec.rb", type: :view do
     expect(rendered).to have_content(event.address)
     expect(rendered).to have_content(event.city)
 
-    expect(rendered).to have_link("RSVP", href: event.rsvp_url)
+    expect(rendered).to have_link("RSVP", href: event.url)
     expect(rendered).to have_link("See all events", href: event.events_url)
   end
 
@@ -23,7 +24,7 @@ RSpec.describe "homes/_event_details.html.erb_spec.rb", type: :view do
 
   def event_data
     JSON.parse(
-      File.read(Rails.root.join("spec/fixtures/meetup_events.json"))
-    ).first
+      File.read(Rails.root.join("spec/fixtures/meetup_event.json"))
+    )
   end
 end

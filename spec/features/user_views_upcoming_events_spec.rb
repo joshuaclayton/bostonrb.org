@@ -19,6 +19,22 @@ RSpec.feature "user views details for the next event" do
   end
 
   def events_json
-    File.read(Rails.root.join("spec/fixtures/meetup_events.json"))
+    [future_meetup_event].to_json
+  end
+
+  def future_meetup_event
+    event_data.merge("time" => future_time_ms)
+  end
+
+  def future_time_ms
+    date = 2.days.from_now
+    datetime = DateTime.new(date.year, date.month, date.day, 22, 0)
+    datetime.to_i * 1000
+  end
+
+  def event_data
+    JSON.parse(
+      File.read(Rails.root.join("spec/fixtures/meetup_event.json"))
+    )
   end
 end

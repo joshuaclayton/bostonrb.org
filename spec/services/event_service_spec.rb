@@ -1,58 +1,73 @@
 RSpec.describe EventService do
-  describe "#next_event" do
-    it "returns the next event for the given meetup group" do
+  describe "#upcoming_events" do
+    it "returns upcoming events for the given meetup group" do
       group_name = "my-awesome-group"
-      meetup_events = build_events_for(group_name)
-      fake_meetup_api = FakeMeetupApi.new(events: meetup_events)
+      meetup_event = future_meetup_event(group_name)
+      fake_meetup_api = FakeMeetupApi.new(events: [meetup_event])
 
-      event = EventService.next_event(
+      events = EventService.upcoming_events(
         group_name: "my-awesome-group",
         data_source: fake_meetup_api
       )
 
-      expect(event).to be_found
-
-      event_name = JSON.parse(meetup_events_json).first["name"]
-      expect(event.name).to eq(event_name)
+      expect(events.first.name).to eq(meetup_event["name"])
     end
 
-    context "when a future event is not found" do
-      it "returns an unknown event" do
-        fake_meetup_api = FakeMeetupApi.new(events: [])
+    context "when the API inaccurately returns past events" do
+      it "ignores events from previous days" do
+        group_name = "my-awesome-group"
+        future_meetup_event = future_meetup_event(group_name)
+        past_meetup_event = past_meetup_event(group_name)
 
-        event = EventService.next_event(
-          group_name: "group-with-zero-upcoming-events",
+        fake_meetup_api = FakeMeetupApi.new(
+          events: [past_meetup_event, future_meetup_event]
+        )
+
+        events = EventService.upcoming_events(
+          group_name: "my-awesome-group",
           data_source: fake_meetup_api
         )
 
-        expect(event).not_to be_found
-        expect(event).to be_an_instance_of(UnknownMeetupEvent)
+        expect(events.count).to eq(1)
+        expect(events.first.name).to eq(future_meetup_event["name"])
       end
     end
 
-    context "when the response fails" do
-      it "returns an unknown event" do
-        meetup_group_name = "invalid-meetup-group"
+    context "when the request fails" do
+      it "returns an empty collection" do
         fake_meetup_api = FakeMeetupApi.new(events: [], success: false)
 
-        event = EventService.next_event(
-          group_name: meetup_group_name,
+        events = EventService.upcoming_events(
+          group_name: "invalid-group",
           data_source: fake_meetup_api
         )
 
-        expect(event).not_to be_found
-        expect(event).to be_an_instance_of(UnknownMeetupEvent)
+        expect(events).to be_empty
       end
     end
   end
 
-  def build_events_for(group_name)
-    JSON.parse(meetup_events_json).map do |event|
-      event.deep_merge("group" => { "urlname" => group_name })
-    end
+  def future_meetup_event(group_name)
+    future_time_ms = 2.days.from_now.to_i * 1000
+
+    event_data.deep_merge(
+      "time" => future_time_ms,
+      "group" => { "urlname" => group_name }
+    )
   end
 
-  def meetup_events_json
-    File.read(Rails.root.join("spec/fixtures/meetup_events.json"))
+  def past_meetup_event(group_name)
+    past_time_ms = 2.days.ago.to_i * 1000
+
+    event_data.deep_merge(
+      "time" => past_time_ms,
+      "group" => { "urlname" => group_name }
+    )
+  end
+
+  def event_data
+    JSON.parse(
+      File.read(Rails.root.join("spec/fixtures/meetup_event.json"))
+    )
   end
 end
